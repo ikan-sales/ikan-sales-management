@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>IKAN | Employee Management</title>
   <meta name="description" content="IKAN employee-management workspace for field-sales administration." />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     :root {
       --teal-950: #073e42;
@@ -281,7 +280,7 @@
     .tracking-check { min-height: 37px; display: flex; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid #d7e1e4; background: white; color: var(--ink); font-size: 10px; }
     .tracking-check input { accent-color: var(--teal-700); }
     .map-shell { position: relative; min-height: 590px; background: #dbe7e6; }
-    #gpsMap { position: absolute; inset: 0; z-index: 1; }
+    #gpsMapFrame { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; border: 0; background: #dbe7e6; }
     .tracking-status { position: absolute; z-index: 500; top: 14px; left: 14px; width: min(315px, calc(100% - 28px)); padding: 13px 14px; border: 1px solid rgba(7,114,118,.18); background: rgba(255,255,255,.96); box-shadow: 0 8px 24px rgba(18,59,66,.16); }
     .tracking-status strong { display: block; color: var(--teal-800); font-size: 12px; }
     .tracking-status span { display: block; margin-top: 5px; color: var(--muted); font-size: 9px; }
@@ -289,7 +288,7 @@
     .tracking-meta div { padding: 7px; background: var(--teal-50); }
     .tracking-meta b { display: block; color: var(--ink); font-size: 9px; }
     .tracking-meta small { display: block; margin-top: 2px; color: var(--muted); font-size: 7px; }
-    .gps-pulse { width: 16px; height: 16px; border: 3px solid white; border-radius: 50%; background: #0aa3a2; box-shadow: 0 0 0 7px rgba(10,163,162,.25), 0 2px 8px rgba(0,0,0,.3); }
+    .route-indicator { position: absolute; z-index: 500; left: 14px; bottom: 14px; display: none; padding: 8px 11px; border: 1px solid rgba(7,114,118,.2); color: var(--teal-800); background: rgba(255,255,255,.96); box-shadow: 0 8px 20px rgba(18,59,66,.14); font-size: 9px; font-weight: 700; }
 
     @media (max-width: 1180px) {
       .stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
@@ -521,7 +520,6 @@
 
   <div class="toast" id="toast">✓ <span>Employee saved successfully.</span></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const employees = [
       {id:1,name:'Essam',initials:'ES',role:'Sales Executive',group:'KSA Sales',access:'Mobile + Web',phone:'+971-50-2836541',email:'essam@ikaninc.com',superior:'Rameez P',family:'Employee record on file',birth:'12 Mar 1988',birthISO:'1988-03-12',code:'IKAN-ESSAM',leave:30,last:'2 minutes ago',status:'Active'},
@@ -632,30 +630,21 @@
       'Essam': {lat:26.4207,lng:50.0888,location:'Dammam Industrial Area, KSA',updated:'2 minutes ago',battery:'86%',speed:'0 km/h',status:'Customer visit',route:[[26.4381,50.1032],[26.4310,50.0970],[26.4254,50.0919],[26.4207,50.0888]]},
       'Rameez P': {lat:25.2048,lng:55.2708,location:'IKAN Office, Dubai',updated:'Just now',battery:'78%',speed:'0 km/h',status:'Office',route:[[25.2131,55.2810],[25.2086,55.2761],[25.2048,55.2708]]}
     };
-    let gpsMap=null, gpsMarker=null, gpsRoute=null;
     function drawTracking(personName){
       const person=trackingPeople[personName]||trackingPeople.Adil;
-      if(!window.L||!document.getElementById('gpsMap'))return;
-      if(!gpsMap){
-        gpsMap=L.map('gpsMap',{zoomControl:true,attributionControl:true}).setView([person.lat,person.lng],14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(gpsMap);
-      }
-      if(gpsMarker)gpsMap.removeLayer(gpsMarker);
-      if(gpsRoute){gpsMap.removeLayer(gpsRoute);gpsRoute=null;}
-      const markerIcon=L.divIcon({className:'',html:'<div class="gps-pulse"></div>',iconSize:[16,16],iconAnchor:[8,8]});
-      gpsMarker=L.marker([person.lat,person.lng],{icon:markerIcon}).addTo(gpsMap).bindPopup('<strong>'+personName+'</strong><br>'+person.location).openPopup();
-      if(document.getElementById('routeToggle')?.checked)gpsRoute=L.polyline(person.route,{color:'#078b8c',weight:5,opacity:.8}).addTo(gpsMap);
-      gpsMap.setView([person.lat,person.lng],14,{animate:true});
+      const frame=document.getElementById('gpsMapFrame'); if(!frame)return;
+      const left=(person.lng-.035).toFixed(5),right=(person.lng+.035).toFixed(5),bottom=(person.lat-.025).toFixed(5),top=(person.lat+.025).toFixed(5);
+      frame.src='https://www.openstreetmap.org/export/embed.html?bbox='+left+'%2C'+bottom+'%2C'+right+'%2C'+top+'&layer=mapnik&marker='+person.lat+'%2C'+person.lng;
+      const routeOn=document.getElementById('routeToggle')?.checked;
+      const routeIndicator=document.getElementById('routeIndicator'); routeIndicator.style.display=routeOn?'block':'none'; routeIndicator.textContent='● Travel route enabled · '+person.route.length+' GPS checkpoints';
       document.getElementById('trackingStatus').innerHTML='<strong>'+personName+' · '+person.status+'</strong><span>📍 '+person.location+' · Updated '+person.updated+'</span><div class="tracking-meta"><div><b>'+person.battery+'</b><small>Battery</small></div><div><b>'+person.speed+'</b><small>Current speed</small></div><div><b>GPS active</b><small>Location service</small></div></div>';
-      setTimeout(()=>gpsMap.invalidateSize(),80);
     }
     function renderLiveTracking(){
       activeModule='Live Tracking'; employeeView.hidden=true; moduleView.hidden=false;
-      if(gpsMap){gpsMap.remove();gpsMap=null;gpsMarker=null;gpsRoute=null;}
       moduleView.innerHTML='<section class="panel tracking-panel"><div class="panel-head"><div><h2>Live Tracking</h2><p>GPS location of field-sales employees.</p></div></div>'+
         '<div class="tracking-toolbar"><div class="field"><label for="trackingPerson">Sales Person</label><select class="control" id="trackingPerson">'+Object.keys(trackingPeople).map(n=>'<option'+(n==='Adil'?' selected':'')+'>'+n+'</option>').join('')+'</select></div>'+
         '<label class="tracking-check"><input id="routeToggle" type="checkbox" checked /> Show travelled route</label><button class="btn btn-primary" data-check-location>⌖ Check Location</button></div>'+
-        '<div class="map-shell"><div id="gpsMap" aria-label="Sales employee GPS map"></div><div class="tracking-status" id="trackingStatus"></div></div></section>';
+        '<div class="map-shell"><iframe id="gpsMapFrame" title="Sales employee GPS map" loading="eager"></iframe><div class="tracking-status" id="trackingStatus"></div><div class="route-indicator" id="routeIndicator"></div></div></section>';
       setTimeout(()=>drawTracking('Adil'),100);
     }
     const moduleConfigs = {
