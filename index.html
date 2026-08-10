@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>IKAN | Employee Management</title>
   <meta name="description" content="IKAN employee-management workspace for field-sales administration." />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     :root {
       --teal-950: #073e42;
@@ -274,6 +275,21 @@
     .detail strong { display: block; margin-top: 6px; font-size: 12px; }
     .toast { position: fixed; right: 22px; bottom: 22px; z-index: 100; display: none; align-items: center; gap: 10px; padding: 13px 16px; border-radius: 12px; color: white; background: #143f46; box-shadow: 0 16px 40px rgba(0,0,0,.2); font-size: 12px; }
     .toast.show { display: flex; animation: rise .18s ease-out; }
+    .tracking-panel { overflow: hidden; }
+    .tracking-toolbar { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; padding: 12px; border-bottom: 1px solid var(--line); background: white; }
+    .tracking-toolbar .field { min-width: 220px; }
+    .tracking-check { min-height: 37px; display: flex; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid #d7e1e4; background: white; color: var(--ink); font-size: 10px; }
+    .tracking-check input { accent-color: var(--teal-700); }
+    .map-shell { position: relative; min-height: 590px; background: #dbe7e6; }
+    #gpsMap { position: absolute; inset: 0; z-index: 1; }
+    .tracking-status { position: absolute; z-index: 500; top: 14px; left: 14px; width: min(315px, calc(100% - 28px)); padding: 13px 14px; border: 1px solid rgba(7,114,118,.18); background: rgba(255,255,255,.96); box-shadow: 0 8px 24px rgba(18,59,66,.16); }
+    .tracking-status strong { display: block; color: var(--teal-800); font-size: 12px; }
+    .tracking-status span { display: block; margin-top: 5px; color: var(--muted); font-size: 9px; }
+    .tracking-meta { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin-top: 10px; }
+    .tracking-meta div { padding: 7px; background: var(--teal-50); }
+    .tracking-meta b { display: block; color: var(--ink); font-size: 9px; }
+    .tracking-meta small { display: block; margin-top: 2px; color: var(--muted); font-size: 7px; }
+    .gps-pulse { width: 16px; height: 16px; border: 3px solid white; border-radius: 50%; background: #0aa3a2; box-shadow: 0 0 0 7px rgba(10,163,162,.25), 0 2px 8px rgba(0,0,0,.3); }
 
     @media (max-width: 1180px) {
       .stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
@@ -355,6 +371,10 @@
       #moduleView .stats { margin: 7px 0; gap: 7px; }
       #moduleView .stat-card { padding: 10px 12px; border-radius: 0; box-shadow: none; }
       #moduleView .stat-value { margin-top: 5px; font-size: 17px; }
+      .tracking-toolbar { padding: 7px 8px; }
+      .tracking-toolbar .field { min-width: 240px; }
+      .tracking-check { min-height: 29px; }
+      .map-shell { min-height: calc(100vh - 135px); }
     }
     @media print {
       body { background: white; }
@@ -379,6 +399,7 @@
         <button class="nav-parent active"><span class="nav-icon">♟</span><span>Employees</span><span class="chev">⌄</span></button>
         <div class="nav-sub"><button class="nav-item active">Employee List</button><button class="nav-item">Employee Groups</button></div>
         <button class="nav-item"><span class="nav-icon">▦</span><span>Products</span><span class="chev">‹</span></button>
+        <div class="nav-sub"><button class="nav-item">Product List</button><button class="nav-item">Brands</button><button class="nav-item">Categories</button><button class="nav-item">Units</button><button class="nav-item">Schemes</button></div>
         <button class="nav-item"><span class="nav-icon">◆</span><span>Parties</span></button>
         <button class="nav-item"><span class="nav-icon">▤</span><span>Activities</span><span class="chev">‹</span></button>
         <button class="nav-item"><span class="nav-icon">🛒</span><span>Orders</span></button>
@@ -500,6 +521,7 @@
 
   <div class="toast" id="toast">✓ <span>Employee saved successfully.</span></div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const employees = [
       {id:1,name:'Essam',initials:'ES',role:'Sales Executive',group:'KSA Sales',access:'Mobile + Web',phone:'+971-50-2836541',email:'essam@ikaninc.com',superior:'Rameez P',family:'Employee record on file',birth:'12 Mar 1988',birthISO:'1988-03-12',code:'IKAN-ESSAM',leave:30,last:'2 minutes ago',status:'Active'},
@@ -580,7 +602,7 @@
     document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModals();});
     document.querySelectorAll('.filter').forEach(el=>el.addEventListener('change',render));
     search.addEventListener('input',render);
-    document.getElementById('globalSearch').addEventListener('input',e=>{if(document.getElementById('moduleView').hidden){search.value=e.target.value;render();}else{renderModule(activeModule,e.target.value);}});
+    document.getElementById('globalSearch').addEventListener('input',e=>{if(document.getElementById('moduleView').hidden){search.value=e.target.value;render();}else if(activeModule!=='Live Tracking'){renderModule(activeModule,e.target.value);}});
     document.querySelectorAll('[data-sort]').forEach(btn=>btn.addEventListener('click',()=>{const key=btn.dataset.sort;if(sortKey===key)sortAsc=!sortAsc;else{sortKey=key;sortAsc=true;}render();}));
     body.addEventListener('click',e=>{const view=e.target.closest('[data-view]');const edit=e.target.closest('[data-edit]');if(view)viewEmployee(employees.find(x=>x.id===Number(view.dataset.view)));if(edit)openForm(employees.find(x=>x.id===Number(edit.dataset.edit)));});
     document.getElementById('profileEdit').addEventListener('click',()=>{const e=employees.find(x=>x.id===currentProfileId);closeModals();openForm(e);});
@@ -603,11 +625,49 @@
         render();showToast(`${added} employee record${added===1?'':'s'} imported.`);event.target.value='';
       }; reader.readAsText(file);
     });
+    const trackingPeople = {
+      'Adil': {lat:25.1357,lng:55.2221,location:'Al Quoz Industrial Area, Dubai',updated:'1 minute ago',battery:'91%',speed:'0 km/h',status:'Customer visit',route:[[25.1510,55.2050],[25.1465,55.2098],[25.1417,55.2149],[25.1357,55.2221]]},
+      'Jenny': {lat:25.1866,lng:55.2631,location:'Business Bay, Dubai',updated:'3 minutes ago',battery:'72%',speed:'24 km/h',status:'Travelling',route:[[25.2048,55.2708],[25.1982,55.2685],[25.1914,55.2662],[25.1866,55.2631]]},
+      'Ajay': {lat:24.9861,lng:55.1550,location:'Dubai Investment Park',updated:'5 minutes ago',battery:'64%',speed:'12 km/h',status:'Travelling',route:[[25.0195,55.1663],[25.0084,55.1621],[24.9972,55.1587],[24.9861,55.1550]]},
+      'Essam': {lat:26.4207,lng:50.0888,location:'Dammam Industrial Area, KSA',updated:'2 minutes ago',battery:'86%',speed:'0 km/h',status:'Customer visit',route:[[26.4381,50.1032],[26.4310,50.0970],[26.4254,50.0919],[26.4207,50.0888]]},
+      'Rameez P': {lat:25.2048,lng:55.2708,location:'IKAN Office, Dubai',updated:'Just now',battery:'78%',speed:'0 km/h',status:'Office',route:[[25.2131,55.2810],[25.2086,55.2761],[25.2048,55.2708]]}
+    };
+    let gpsMap=null, gpsMarker=null, gpsRoute=null;
+    function drawTracking(personName){
+      const person=trackingPeople[personName]||trackingPeople.Adil;
+      if(!window.L||!document.getElementById('gpsMap'))return;
+      if(!gpsMap){
+        gpsMap=L.map('gpsMap',{zoomControl:true,attributionControl:true}).setView([person.lat,person.lng],14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(gpsMap);
+      }
+      if(gpsMarker)gpsMap.removeLayer(gpsMarker);
+      if(gpsRoute){gpsMap.removeLayer(gpsRoute);gpsRoute=null;}
+      const markerIcon=L.divIcon({className:'',html:'<div class="gps-pulse"></div>',iconSize:[16,16],iconAnchor:[8,8]});
+      gpsMarker=L.marker([person.lat,person.lng],{icon:markerIcon}).addTo(gpsMap).bindPopup('<strong>'+personName+'</strong><br>'+person.location).openPopup();
+      if(document.getElementById('routeToggle')?.checked)gpsRoute=L.polyline(person.route,{color:'#078b8c',weight:5,opacity:.8}).addTo(gpsMap);
+      gpsMap.setView([person.lat,person.lng],14,{animate:true});
+      document.getElementById('trackingStatus').innerHTML='<strong>'+personName+' · '+person.status+'</strong><span>📍 '+person.location+' · Updated '+person.updated+'</span><div class="tracking-meta"><div><b>'+person.battery+'</b><small>Battery</small></div><div><b>'+person.speed+'</b><small>Current speed</small></div><div><b>GPS active</b><small>Location service</small></div></div>';
+      setTimeout(()=>gpsMap.invalidateSize(),80);
+    }
+    function renderLiveTracking(){
+      activeModule='Live Tracking'; employeeView.hidden=true; moduleView.hidden=false;
+      if(gpsMap){gpsMap.remove();gpsMap=null;gpsMarker=null;gpsRoute=null;}
+      moduleView.innerHTML='<section class="panel tracking-panel"><div class="panel-head"><div><h2>Live Tracking</h2><p>GPS location of field-sales employees.</p></div></div>'+
+        '<div class="tracking-toolbar"><div class="field"><label for="trackingPerson">Sales Person</label><select class="control" id="trackingPerson">'+Object.keys(trackingPeople).map(n=>'<option'+(n==='Adil'?' selected':'')+'>'+n+'</option>').join('')+'</select></div>'+
+        '<label class="tracking-check"><input id="routeToggle" type="checkbox" checked /> Show travelled route</label><button class="btn btn-primary" data-check-location>⌖ Check Location</button></div>'+
+        '<div class="map-shell"><div id="gpsMap" aria-label="Sales employee GPS map"></div><div class="tracking-status" id="trackingStatus"></div></div></section>';
+      setTimeout(()=>drawTracking('Adil'),100);
+    }
     const moduleConfigs = {
       'Live Tracking': {eyebrow:'Field visibility',desc:'Monitor the latest employee positions and route activity.',stats:[['Employees Online','4','Live location enabled'],['In Transit','2','Moving between parties'],['At Customer','2','Visits in progress'],['Alerts','0','No exceptions today']],columns:['Employee','Current Location','Last Update','Battery','Status'],rows:[['Essam','Dammam Industrial Area','1 min ago','86%','At customer'],['Jenny','Business Bay, Dubai','3 min ago','72%','In transit'],['Adil','Al Quoz, Dubai','4 min ago','91%','At customer'],['Ajay','Dubai Investment Park','7 min ago','64%','In transit']]},
       'Dashboard': {eyebrow:'Operations overview',desc:'Today’s sales activity and field-team performance at a glance.',stats:[['Sales Visits','26','+12% from yesterday'],['Orders Booked','AED 98,500','8 confirmed orders'],['Collections','AED 31,500','5 receipts posted'],['Active Staff','4 / 5','One employee on leave']],columns:['Performance Area','Today','Month to Date','Target','Status'],rows:[['Customer Visits','26','286','320','On track'],['Order Value','AED 98,500','AED 1.08M','AED 1.20M','On track'],['Collections','AED 31,500','AED 410K','AED 500K','Attention'],['New Parties','3','28','35','On track']]},
       'Employee Groups': {eyebrow:'People operations',desc:'Organize employees by territory, function and reporting structure.',stats:[['Groups','3','Active organizational groups'],['UAE Sales','3','Primary field team'],['KSA Sales','1','Saudi territory'],['Management','1','Administration']],columns:['Group Name','Manager','Members','Territory','Status'],rows:[['UAE Sales','Rameez P','3','United Arab Emirates','Active'],['KSA Sales','Rameez P','1','Saudi Arabia','Active'],['Management','IKAN Management','1','All regions','Active']]},
       'Products': {eyebrow:'Product operations',desc:'Manage products, pricing, availability and brand visibility.',stats:[['Products','48','Across all categories'],['In Stock','43','89.6% availability'],['Low Stock','4','Reorder recommended'],['Out of Stock','1','Purchase request raised']],columns:['Product','SKU','Brand','Unit Price','Available Stock','Status'],rows:[['IKAN Tile Adhesive 20kg','IKA-TA-20','IKAN','AED 46.00','1,280','In stock'],['AquaMix Sealer 1L','AQM-SL-01','AquaMix','AED 98.00','340','In stock'],['IKAN Grout White 5kg','IKA-GR-05','IKAN','AED 34.00','126','Low stock'],['AquaMix Cleaner 1L','AQM-CL-01','AquaMix','AED 72.00','214','In stock'],['IKAN Waterproofing 20kg','IKA-WP-20','IKAN','AED 138.00','88','Low stock']]},
+      'Product List': {eyebrow:'Product operations',desc:'Complete product catalogue with pricing, availability and status.',stats:[['Products','48','Across all categories'],['Active','46','Available to sales staff'],['Low Stock','4','Reorder recommended'],['Brands','2','IKAN and AquaMix']],columns:['Product','SKU','Brand','Category','Unit Price','Status'],rows:[['IKAN Tile Adhesive 20kg','IKA-TA-20','IKAN','Tile Installation','AED 46.00','Active'],['AquaMix Sealer 1L','AQM-SL-01','AquaMix','Surface Care','AED 98.00','Active'],['IKAN Grout White 5kg','IKA-GR-05','IKAN','Grouts','AED 34.00','Active'],['AquaMix Cleaner 1L','AQM-CL-01','AquaMix','Surface Care','AED 72.00','Active'],['IKAN Waterproofing 20kg','IKA-WP-20','IKAN','Waterproofing','AED 138.00','Active']]},
+      'Brands': {eyebrow:'Product setup',desc:'Product brands available to the IKAN field-sales team.',stats:[['Brands','2','Active product brands'],['IKAN Products','31','Core construction range'],['AquaMix Products','17','Surface-care range'],['Active','100%','All brands available']],columns:['Brand','Brand Code','Products','Market','Created By','Status'],rows:[['IKAN','BR-IKAN','31','UAE and KSA','Rameez P','Active'],['AquaMix','BR-AQM','17','UAE and KSA','Rameez P','Active']]},
+      'Categories': {eyebrow:'Product setup',desc:'Product categories used for catalogue organization and reporting.',stats:[['Categories','6','All active'],['Largest Category','Tile Installation','14 products'],['Surface Care','11 products','AquaMix range'],['New This Year','1','Waterproofing']],columns:['Category','Code','Products','Default Unit','Display Order','Status'],rows:[['Tile Installation','CAT-TI','14','Bag','1','Active'],['Grouts','CAT-GR','8','Bag','2','Active'],['Surface Care','CAT-SC','11','Bottle','3','Active'],['Waterproofing','CAT-WP','7','Pail','4','Active'],['Construction Chemicals','CAT-CC','8','Unit','5','Active']]},
+      'Units': {eyebrow:'Product setup',desc:'Units of measure used for pricing, orders and inventory.',stats:[['Units','7','Available in transactions'],['Primary Unit','Piece','Used by 16 products'],['Weight Units','2','Kilogram and bag'],['Volume Units','2','Litre and bottle']],columns:['Unit Name','Short Code','Unit Type','Products','Decimal Allowed','Status'],rows:[['Piece','PCS','Quantity','16','No','Active'],['Bag','BAG','Package','14','No','Active'],['Kilogram','KG','Weight','8','Yes','Active'],['Bottle','BTL','Package','6','No','Active'],['Litre','LTR','Volume','4','Yes','Active']]},
+      'Schemes': {eyebrow:'Product setup',desc:'Customer promotions, product offers and sales incentive schemes.',stats:[['Active Schemes','3','Currently available'],['Eligible Parties','86','Across UAE and KSA'],['Products Included','18','Selected product lines'],['Ending Soon','1','Expires this month']],columns:['Scheme','Code','Valid From','Valid To','Applies To','Status'],rows:[['August Volume Offer','SCH-AUG26','01 Aug 2026','31 Aug 2026','IKAN Tile Adhesive','Active'],['AquaMix Bundle','SCH-AQM26','15 Jul 2026','15 Sep 2026','AquaMix Range','Active'],['KSA Dealer Incentive','SCH-KSA26','01 Aug 2026','30 Sep 2026','KSA Dealers','Active']]},
       'Parties': {eyebrow:'Customer network',desc:'Customer and dealer accounts assigned to the field-sales team.',stats:[['Active Parties','164','Across UAE and KSA'],['Visited Today','18','11% of active parties'],['New This Month','9','Qualified accounts'],['Outstanding','AED 286K','Receivables balance']],columns:['Party Name','City','Contact Person','Assigned To','Outstanding','Status'],rows:[['Al Quoz Project Supplies','Dubai','Khalid A.','Adil','AED 18,400','Active'],['Cityscape Interiors','Dubai','Maria S.','Jenny','AED 12,800','Active'],['Dammam Building Materials','Dammam','Fahad R.','Essam','SAR 24,600','Active'],['BlueStone Technical Services','Dubai','Ahmed K.','Ajay','AED 8,250','Active']]},
       'Activities': {eyebrow:'Sales activity',desc:'Calls, meetings, follow-ups and customer interactions.',stats:[['Activities Today','32','Across all employees'],['Completed','25','78% completion rate'],['Open Follow-ups','7','Due before close'],['Overdue','1','Requires attention']],columns:['Time','Employee','Activity','Party','Outcome','Status'],rows:[['09:15','Adil','Site Visit','Al Quoz Project Supplies','Quotation requested','Completed'],['10:05','Jenny','Follow-up Call','Cityscape Interiors','Order confirmation','Completed'],['11:20','Essam','Product Presentation','Dammam Building Materials','Technical review','Completed'],['14:30','Ajay','Technical Meeting','BlueStone Technical Services','Scheduled','Upcoming']]},
       'Orders': {eyebrow:'Order management',desc:'Review field orders, approvals and fulfillment status.',stats:[['Orders Today','8','AED 98,500 value'],['Pending Approval','2','AED 22,400 value'],['Processing','4','Warehouse confirmed'],['Completed','2','Ready for collection']],columns:['Order No.','Party','Employee','Order Value','Created','Status'],rows:[['ORD-260810-018','Al Quoz Project Supplies','Adil','AED 18,750','10 Aug 2026','Processing'],['ORD-260810-017','Cityscape Interiors','Jenny','AED 26,100','10 Aug 2026','Approved'],['ORD-260810-016','Dammam Building Materials','Essam','SAR 31,400','10 Aug 2026','Pending approval'],['ORD-260810-015','BlueStone Technical Services','Ajay','AED 22,250','10 Aug 2026','Processing']]},
@@ -644,7 +704,9 @@
         '<div class="table-foot"><span>Showing '+rows.length+' of '+cfg.rows.length+' entries</span><div class="pagination"><button class="page-btn">Previous</button><button class="page-btn current">1</button><button class="page-btn">Next</button></div></div></section>';
     }
     moduleView.addEventListener('input',e=>{if(e.target.matches('[data-module-search]'))renderModule(activeModule,e.target.value);});
+    moduleView.addEventListener('change',e=>{if(e.target.matches('#trackingPerson,#routeToggle'))drawTracking(document.getElementById('trackingPerson').value);});
     moduleView.addEventListener('click',e=>{
+      if(e.target.closest('[data-check-location]'))drawTracking(document.getElementById('trackingPerson').value);
       if(e.target.closest('[data-module-print]'))window.print();
       if(e.target.closest('[data-module-new]'))showToast('New '+activeModule.toLowerCase()+' record opened.');
       if(e.target.closest('[data-module-view]'))showToast('Record details opened.');
@@ -658,7 +720,8 @@
       const label=(n.querySelector('.nav-icon')?n.children[1]?.textContent:n.textContent).trim();
       document.querySelectorAll('.nav-item,.nav-parent').forEach(x=>x.classList.remove('active')); n.classList.add('active');
       document.getElementById('globalSearch').value='';
-      if(label==='Employees'||label==='Employee List'){moduleView.hidden=true;employeeView.hidden=false;search.value='';render();}
+      if(label==='Live Tracking')renderLiveTracking();
+      else if(label==='Employees'||label==='Employee List'){moduleView.hidden=true;employeeView.hidden=false;search.value='';render();}
       else if(moduleConfigs[label])renderModule(label);
     }));
     render();
